@@ -79,6 +79,9 @@ function preload() {
   for (let i = 1; i <= 4; i++) {
     this.load.image(`block${i}`, `assets/blocks/block${i}.png`);
   }
+  for (let i = 1; i <= 4; i++) {
+    this.load.image(`ground${i}`, `assets/blocks/ground${i}.png`);
+  }
   this.load.image('movingPlatformLeft', 'assets/blocks/movingPlatformLeft.png')
   this.load.image('movingPlatformCenter', 'assets/blocks/movingPlatformCenter.png')
   this.load.image('movingPlatformRight', 'assets/blocks/movingPlatformRight.png')
@@ -202,9 +205,15 @@ function create() {
     } else {
       // piattaforma statica
       for (let i = 0; i < p.width; i++) {
-        // Scegli una texture random tra block1, block2, block3, block4
-        const randomBlock = `block${Math.floor(Math.random() * 4) + 1}`;
-        const block = staticPlatform.create(p.x + i * blockSize, p.y, randomBlock).setOrigin(0, 0);
+        let textureKey;
+        if (p.y === 568) {
+          // Scegli una texture random tra ground1, ground2, ground3, ground4
+          textureKey = `ground${Math.floor(Math.random() * 4) + 1}`;
+        } else {
+          // Scegli una texture random tra block1, block2, block3, block4
+          textureKey = `block${Math.floor(Math.random() * 4) + 1}`;
+        }
+        const block = staticPlatform.create(p.x + i * blockSize, p.y, textureKey).setOrigin(0, 0);
         block.setScale(2);
         block.refreshBody();
       }
@@ -515,8 +524,10 @@ function update(time, delta) {
 
   if (currentMovingPlatform) {
     const dx = currentMovingPlatform.x - (currentMovingPlatform.prevX || currentMovingPlatform.x);
-    // Solo movimento orizzontale!
-    player.x += dx;
+    // Muovi il player solo se è appoggiato
+    if (player.body.blocked.down) {
+      player.x += dx;
+    }
   }
 }
 
