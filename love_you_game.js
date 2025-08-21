@@ -66,7 +66,7 @@ const LETTER_KEYS = ['A', 'U', 'G', 'U2', 'R', 'I'];
 
 function preload() {
   //load del livello
-  this.load.json('level1', 'assets/levels/level1.json');
+  this.load.json('level1', 'assets/levels/level2.json');
 
   //reset variabili
   collected = 0;
@@ -282,6 +282,7 @@ function create() {
   player.setCollideWorldBounds(true);
   this.physics.add.collider(player, staticPlatform);
   cursors = this.input.keyboard.createCursorKeys();
+  window.cursors = cursors; // rendi cursors globale per i controlli touch
 
   // Camera
   this.cameras.main.startFollow(player, true, 1, 1);
@@ -301,6 +302,7 @@ function create() {
   
   this.physics.add.collider(player, staticPlatform);
   this.physics.add.collider(letters, staticPlatform);
+  this.physics.add.collider(letters, movingPlatform);
   this.physics.add.overlap(player, letters, collectLetter, null, this);
   this.physics.add.collider(player, movingPlatform, onMovingPlatformCollision, null, this);
 }
