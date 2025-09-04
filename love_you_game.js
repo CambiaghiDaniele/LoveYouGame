@@ -57,9 +57,14 @@ let backgroundMusic;
 //per idle animation
 let idleTimer = 0;
 let isIdle = false;
+let isInIdleSpecial2 = false;
+let lastBlinkTime = 0;
+const BLINK_INTERVAL = 5000;
 let lastMovementTime = 0;
 let lastIdleSpecialTime = 0;
-const IDLE_DELAY = 5000; // 5 secondi
+let lastIdleSpecialPlayTime = 0;
+const IDLE_SPECIAL = 5000; // 5 secondi
+const IDLE_SPECIAL_2 = 15000; // 15 secondi
 
 
 const LETTER_KEYS = ['A', 'U', 'G', 'U2', 'R', 'I'];
@@ -100,13 +105,22 @@ function preload() {
 
   this.load.image('particle', 'assets/misc/particle.png')
   this.load.image('heartParticle', 'assets/misc/heartParticle.png')
-
+  //fiori
+  this.load.spritesheet('flower_yellow', 'assets/misc/flower_yellow.png', { frameWidth: 16, frameHeight: 16 });
+  this.load.spritesheet('flower_cyan', 'assets/misc/flower_cyan.png', { frameWidth: 16, frameHeight: 16 });
+  this.load.spritesheet('flower_pink', 'assets/misc/flower_pink.png', { frameWidth: 16, frameHeight: 16 });
+  //erba
+  this.load.spritesheet('grass_1', 'assets/misc/grass_1.png', { frameWidth: 16, frameHeight: 16 });
+  this.load.spritesheet('grass_2', 'assets/misc/grass_2.png', { frameWidth: 16, frameHeight: 16 });
+  this.load.spritesheet('grass_3', 'assets/misc/grass_3.png', { frameWidth: 16, frameHeight: 16 });
   //audio
   this.load.audio('bgMusic', 'assets/audio/music.mp3');
   this.load.audio('collect', 'assets/audio/collect.mp3');
 }
 
 function create() {
+  resetState.call(this);  // <-- reset variabili globali
+  
   //musica
   if (backgroundMusic) {
     backgroundMusic.destroy(); // 🔁 Stop and reset
@@ -119,7 +133,7 @@ function create() {
   backgroundMusic.play();
 
   // World bounds
-  const WORLD_WIDTH = this.scale.width * 10;
+  const WORLD_WIDTH = this.scale.width * 15;
   const WORLD_HEIGHT = this.scale.height; // puoi aumentare se vuoi più "vuoto" sotto
 
   // setBounds(x, y, width, height, checkLeft, checkRight, checkUp, checkDown)
@@ -207,15 +221,89 @@ function create() {
       for (let i = 0; i < p.width; i++) {
         let textureKey;
         if (p.y === 568) {
-          // Scegli una texture random tra ground1, ground2, ground3, ground4
           textureKey = `ground${Math.floor(Math.random() * 4) + 1}`;
         } else {
-          // Scegli una texture random tra block1, block2, block3, block4
           textureKey = `block${Math.floor(Math.random() * 4) + 1}`;
         }
         const block = staticPlatform.create(p.x + i * blockSize, p.y, textureKey).setOrigin(0, 0);
         block.setScale(2);
         block.refreshBody();
+
+        //fiori
+        this.anims.create({
+          key: 'flower-yellow-anim',
+          frames: this.anims.generateFrameNumbers('flower_yellow', { start: 0, end: 4 }),
+          frameRate: 6,
+          repeat: -1,
+          yoyo: true
+        });
+        this.anims.create({
+          key: 'flower-cyan-anim',
+          frames: this.anims.generateFrameNumbers('flower_cyan', { start: 0, end: 4 }),
+          frameRate: 6,
+          repeat: -1,
+          yoyo: true
+        });
+        this.anims.create({
+          key: 'flower-pink-anim',
+          frames: this.anims.generateFrameNumbers('flower_pink', { start: 0, end: 4 }),
+          frameRate: 6,
+          repeat: -1,
+          yoyo: true
+        });
+
+        //erba
+        this.anims.create({
+          key: 'grass-1-anim',
+          frames: this.anims.generateFrameNumbers('grass_1', { start: 0, end: 3 }),
+          frameRate: 5,
+          repeat: -1,
+          yoyo: true
+        });
+        this.anims.create({
+          key: 'grass-2-anim',
+          frames: this.anims.generateFrameNumbers('grass_2', { start: 0, end: 3 }),
+          frameRate: 5,
+          repeat: -1,
+          yoyo: true
+        });
+        this.anims.create({
+          key: 'grass-3-anim',
+          frames: this.anims.generateFrameNumbers('grass_3', { start: 0, end: 3 }),
+          frameRate: 5,
+          repeat: -1,
+          yoyo: true
+        });
+
+        // AGGIUNGI FIORE RANDOM SOLO SUI GROUND
+        if (p.y === 568) {
+          const rand = Math.random();
+
+          if (rand < 0.1) {
+            // 10% di probabilità per i fiori
+            const flowerTypes = ['flower_yellow', 'flower_cyan', 'flower_pink'];
+            const flowerAnims = ['flower-yellow-anim', 'flower-cyan-anim', 'flower-pink-anim'];
+            const index = Math.floor(Math.random() * flowerTypes.length);
+
+            const flower = this.add.sprite(block.x + blockSize / 2, block.y, flowerTypes[index]);
+            flower.setOrigin(0.5, 1);
+            flower.setScale(2);
+            flower.anims.play(flowerAnims[index]);
+            flower.setDepth(1);
+
+          } else if (rand < 0.35) {
+            // 35% meno 10% = 25% per l'erba
+            const grassTypes = ['grass_1', 'grass_2', 'grass_3'];
+            const grassAnims = ['grass-1-anim', 'grass-2-anim', 'grass-3-anim'];
+            const index = Math.floor(Math.random() * grassTypes.length);
+
+            const grass = this.add.sprite(block.x + blockSize / 2, block.y, grassTypes[index]);
+            grass.setOrigin(0.5, 1);
+            grass.setScale(2);
+            grass.anims.play(grassAnims[index]);
+            grass.setDepth(1);
+          }
+        }
       }
     }
   });
@@ -266,6 +354,22 @@ function create() {
     key: 'idle-special',
     frames: this.anims.generateFrameNumbers('player', { frames: [8, 9, 10, 11, 10, 9, 10, 11, 10, 9, 10, 11, 10, 9, 8, 0] }),
     frameRate: 10,
+    repeat: 0,
+    yoyo: false
+  });
+
+  this.anims.create({
+    key: 'idle-special-2',
+    frames: this.anims.generateFrameNumbers('player', { frames: [0, 12, 13, 14] }),
+    frameRate: 10,
+    repeat: 0,
+    yoyo: false
+  });
+
+  this.anims.create({
+    key: 'idle-special-2-blink',
+    frames: this.anims.generateFrameNumbers('player', { frames: [14, 15, 14, 15, 14] }),
+    frameRate: 8,
     repeat: 0,
     yoyo: false
   });
@@ -332,6 +436,7 @@ function collectLetter(player, letter) {
   const msg = messages[key] || 'Lettera misteriosa 💌';
   collected++;
 
+  // Effetto particelle
   const particles = this.add.particles('particle');
   const emitter = particles.createEmitter({
     x: letter.x,
@@ -347,16 +452,69 @@ function collectLetter(player, letter) {
 
   this.sound.play('collect');
 
-  text.setText(msg);
-  text.setAlpha(1);
-  if (fadeTween) fadeTween.stop();
-  fadeTween = game.scene.scenes[0].tweens.add({
-    targets: text,
-    alpha: 0,
-    duration: 3000,
-    ease: 'Power1'
+  // 🔹 Creazione balloon
+  const balloonPadding = 10;
+  const balloon = this.add.graphics();
+  balloon.fillStyle(0x000000, 0.7); // sfondo nero trasparente
+  balloon.lineStyle(2, 0xffffff, 1); // bordo bianco
+
+  // Crea il testo
+  const popupText = this.add.text(0, 0, msg, {
+    fontSize: `${Math.round(this.scale.height / 35)}px`,
+    fill: '#ffccff',
+    fontStyle: 'bold',
+    align: 'center',
+    wordWrap: { width: 200 }
   });
 
+  // Calcola dimensioni balloon
+  const textBounds = popupText.getBounds();
+  const width = textBounds.width + balloonPadding * 2;
+  const height = textBounds.height + balloonPadding * 2;
+  const x = letter.x - width / 2;
+  const y = letter.y - height - 40; // sopra la lettera
+
+  // Disegna nuvoletta
+  balloon.fillRoundedRect(x, y, width, height, 12);
+  balloon.strokeRoundedRect(x, y, width, height, 12);
+
+  // Piccola freccetta verso la lettera
+  balloon.fillTriangle(
+    letter.x - 6, y + height,
+    letter.x + 6, y + height,
+    letter.x, y + height + 10
+  );
+
+  // Posiziona testo dentro balloon
+  popupText.setPosition(letter.x, y + height / 2).setOrigin(0.5);
+
+  // Raggruppa balloon + testo per animazione
+  const container = this.add.container(0, 0, [balloon, popupText]);
+  container.setAlpha(0);
+
+  // Animazione: comparsa, salita, dissolvenza
+  this.tweens.add({
+    targets: container,
+    alpha: 1,
+    y: -20,
+    duration: 600,
+    ease: 'Back.Out',
+    onComplete: () => {
+      this.tweens.add({
+        targets: container,
+        alpha: 0,
+        duration: 1200,
+        delay: 1500,
+        onComplete: () => {
+          balloon.destroy();
+          popupText.destroy();
+          container.destroy();
+        }
+      });
+    }
+  });
+
+  // Tutte le lettere raccolte
   if (collected === LETTER_KEYS.length) {
     const hearts = this.add.particles('heartParticle');
     hearts.createEmitter({
@@ -368,35 +526,28 @@ function collectLetter(player, letter) {
       blendMode: 'ADD',
       lifespan: 1000,
       frequency: 100,
-    }); 
+    });
 
     game.scene.scenes[0].time.delayedCall(3500, () => {
       text.setText("Hai raccolto tutte le lettere: AUGURI amore mio! 🎉");
       text.setAlpha(1);
-      
-      // Fade della camera
       this.cameras.main.fadeOut(4000, 255, 255, 255);
-      
-      // Restart o nuova scena dopo un po’
-      this.time.delayedCall(5000, () => {
-        this.scene.restart();
-      });
+      this.time.delayedCall(5000, () => this.scene.restart());
     });
   }
 }
 
-function update(time, delta) {
 
-  //movimento nuvole
+function update(time, delta) {
+  // movimento nuvole
   clouds.tilePositionX += 0.02;
 
-  //movimento player
   if (!cursors) return;
 
-  const onGround = player.body.touching.down;
+  const onGround = player.body.blocked.down; // più preciso di .touching.down
   const moving = cursors.left.isDown || cursors.right.isDown || !onGround;
 
-  // Se il player si muove o salta, resettiamo il timer
+  // Reset idle timer se c’è movimento
   if (moving) {
     lastMovementTime = time;
     isIdle = false;
@@ -431,37 +582,80 @@ function update(time, delta) {
     isJumping = false;
   }
 
-  // Gestione animazioni
+  // Animazioni
   if (onGround) {
     if (player.body.velocity.x !== 0) {
+      // Camminata
       player.anims.play('walk', true);
+
+      // Reset stato idle
+      isIdle = false;
+      isInIdleSpecial2 = false;
+      lastMovementTime = time;
+      lastIdleSpecialTime = 0;
+      lastBlinkTime = 0;
     } else {
-      // Idle "speciale" se il player è fermo da più di 5 secondi
-      if (time - lastMovementTime > IDLE_DELAY) {
-        isIdle = true;
-        if (time - lastIdleSpecialTime > IDLE_DELAY) {
-          lastIdleSpecialTime = time;
+      // È fermo
+      const idleDuration = time - lastMovementTime;
+
+      if (idleDuration > IDLE_SPECIAL_2) {
+        // IDLE-SPECIAL-2 attivo
+        if (!isInIdleSpecial2) {
+          player.anims.play('idle-special-2', true);
+          isInIdleSpecial2 = true;
+          lastBlinkTime = time;
+        } else {
+          // Ogni tot secondi, esegue blink
+          if (time - lastBlinkTime > BLINK_INTERVAL) {
+            player.anims.play('idle-special-2-blink', true);
+            lastBlinkTime = time;
+          }
+        }
+      } else if (idleDuration > IDLE_SPECIAL) {
+        // Ogni IDLE_SPECIAL ms, riproduci idle-special
+        if (time - lastIdleSpecialPlayTime > IDLE_SPECIAL) {
           player.anims.play('idle-special', true);
+          lastIdleSpecialPlayTime = time;
+          isIdle = true;
+          isInIdleSpecial2 = false;
         }
       } else {
+        // Idle normale
         player.anims.play('idle', true);
+        isIdle = false;
+        isInIdleSpecial2 = false;
+        lastIdleSpecialPlayTime = 0;
       }
     }
-  }
-
-  if (!onGround && player.body.velocity.y > 0) {
+  } else {
+    // In salto
     player.anims.play('jump', true);
+
+    // Reset stato idle
+    isIdle = false;
+    isInIdleSpecial2 = false;
+    lastIdleSpecialTime = 0;
+    lastBlinkTime = 0;
   }
 
+  // Se idle-special finisce → torna a idle
+  player.off('animationcomplete-idle-special'); // previene doppioni
+  player.on('animationcomplete-idle-special', () => {
+    if (isIdle) {
+      player.anims.play('idle', true);
+    }
+  });
+
+  // Snap a pixel interi
   player.x = Math.round(player.x);
   player.y = Math.round(player.y);
 
-  //morte player
+  // Morte cadendo fuori dal mondo
   if (player.y > this.physics.world.bounds.height + 100) {
     playerDied.call(this);
   }
 
-  // movimento piattaforme mobili avanti e indietro
+  // Movimento piattaforme mobili
   if (movingPlatform.leaders) {
     movingPlatform.leaders.forEach(leader => {
       // Movimento orizzontale
@@ -476,8 +670,6 @@ function update(time, delta) {
       // Movimento verticale
       if (leader.startY !== leader.targetY) {
         leader.y += leader.speed * leader.directionY * delta / 1000;
-
-        // Se va oltre uno dei due estremi, inverti la direzione e clamp
         if (leader.directionY === 1 && leader.y >= leader.targetY) {
           leader.y = leader.targetY;
           leader.directionY = -1;
@@ -487,36 +679,34 @@ function update(time, delta) {
         }
       }
 
-      // Aggiorna la posizione degli altri blocchi rispetto al leader
-      for (let i = 0; i < leader.blocks.length; i++) {
-        const block = leader.blocks[i];
+      // Aggiorna i blocchi
+      leader.blocks.forEach((block, i) => {
         block.x = leader.x + i * blockSize;
         block.y = leader.y;
         block.refreshBody();
         block.prevX = block.x;
         block.prevY = block.y;
-      }
-      leader.refreshBody(); // <--- aggiorna anche il leader
+      });
+      leader.refreshBody();
     });
   }
 
+  // Controlla se il player è su una piattaforma mobile
   currentMovingPlatform = null;
   if (movingPlatform.leaders) {
     movingPlatform.leaders.forEach(leader => {
       leader.blocks.forEach(block => {
-        // Verifica se il player è sopra il blocco usando i bounding box Arcade
         const playerBottom = player.body.y + player.body.height;
         const blockTop = block.body.y;
         const blockLeft = block.body.x;
         const blockRight = block.body.x + block.body.width;
 
-        // Il player è sopra la piattaforma e non sta saltando
         if (
-          Math.abs(playerBottom - blockTop) <= 2 && // tolleranza di 2px
+          Math.abs(playerBottom - blockTop) <= 2 &&
           player.body.x + player.body.width > blockLeft &&
           player.body.x < blockRight &&
           player.body.velocity.y >= 0 &&
-          player.body.blocked.down // il player è appoggiato
+          onGround
         ) {
           currentMovingPlatform = block;
         }
@@ -524,13 +714,33 @@ function update(time, delta) {
     });
   }
 
+  // Muovi il player con la piattaforma mobile
   if (currentMovingPlatform) {
     const dx = currentMovingPlatform.x - (currentMovingPlatform.prevX || currentMovingPlatform.x);
-    // Muovi il player solo se è appoggiato
-    if (player.body.blocked.down) {
+    if (onGround) {
       player.x += dx;
     }
   }
+}
+
+function resetState() {
+  collected = 0;
+
+  // salto
+  isJumping = false;
+  jumpStartTime = 0;
+
+  // idle
+  idleTimer = 0;
+  isIdle = false;
+  lastMovementTime = 0;
+  lastIdleSpecialTime = 0;
+
+  // piattaforme mobili
+  currentMovingPlatform = null;
+
+  // morte player
+  if (this) this.playerIsDead = false;
 }
 
 //funzione per quando il player muore
