@@ -113,6 +113,10 @@ function preload() {
   this.load.spritesheet('grass_1', 'assets/misc/grass_1.png', { frameWidth: 16, frameHeight: 16 });
   this.load.spritesheet('grass_2', 'assets/misc/grass_2.png', { frameWidth: 16, frameHeight: 16 });
   this.load.spritesheet('grass_3', 'assets/misc/grass_3.png', { frameWidth: 16, frameHeight: 16 });
+  //uccuelli
+  this.load.spritesheet('bird_red', 'assets/misc/bird_red.png', { frameWidth: 32, frameHeight: 32 });
+  this.load.spritesheet('bird_blue', 'assets/misc/bird_blue.png', { frameWidth: 32, frameHeight: 32 });
+  this.load.spritesheet('bird_green', 'assets/misc/bird_green.png', { frameWidth: 32, frameHeight: 32 });
   //audio
   this.load.audio('bgMusic', 'assets/audio/music.mp3');
   this.load.audio('collect', 'assets/audio/collect.mp3');
@@ -393,6 +397,24 @@ function create() {
   this.cameras.main.roundPixels = true;
   this.cameras.main.setFollowOffset(-200, 0);
 
+  //uccelli
+
+  const birdColors = ['red', 'blue', 'green'];
+  birdColors.forEach(color => {
+    this.anims.create({
+      key: `fly-${color}`,
+      frames: this.anims.generateFrameNumbers(`bird_${color}`, { start: 0, end: 3 }),
+      frameRate: 10,
+      repeat: -1
+    });
+  });
+
+  this.time.addEvent({
+    delay: Phaser.Math.Between(15000, 30000), // ogni 15–30 secondi
+    loop: true,
+    callback: () => spawnBirdFlock.call(this, this.player)
+  });
+
   // Messaggio
   text = this.add.text(400, 500, '', {
     fontSize: `${Math.round(this.scale.height / 25)}px`,
@@ -452,7 +474,7 @@ function collectLetter(player, letter) {
 
   this.sound.play('collect');
 
-  // 🔹 Creazione balloon
+  // Creazione balloon
   const balloonPadding = 10;
   const balloon = this.add.graphics();
   balloon.fillStyle(0x000000, 0.7); // sfondo nero trasparente
@@ -529,11 +551,48 @@ function collectLetter(player, letter) {
     });
 
     game.scene.scenes[0].time.delayedCall(3500, () => {
-      text.setText("Hai raccolto tutte le lettere: AUGURI amore mio! 🎉");
-      text.setAlpha(1);
-      this.cameras.main.fadeOut(4000, 255, 255, 255);
-      this.time.delayedCall(5000, () => this.scene.restart());
+      // Disattiva input e movimento
+      player.setVelocity(0, 0);
+      player.body.enable = false;
+
+      // Sfondo finale semi-trasparente
+      const endBg = this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0x000000, 0.85)
+        .setOrigin(0)
+        .setScrollFactor(0);
+
+      // Testo finale
+      const finalMessage = this.add.text(this.scale.width / 2, this.scale.height / 2 - 50,
+        "Hai raccolto tutte le lettere:\nAUGURI amore mio ❤️", {
+          fontSize: `${Math.round(this.scale.height / 18)}px`,
+          fill: '#ff99cc',
+          fontStyle: 'bold',
+          align: 'center'
+        }
+      ).setOrigin(0.5).setScrollFactor(0).setAlpha(0);
+
+      // Cuore animato sotto il messaggio
+      const heart = this.add.image(this.scale.width / 2, this.scale.height / 2 + 80, 'heartParticle')
+        .setScale(3).setScrollFactor(0)
+        .setAlpha(0);
+
+      // Fade-in
+      this.tweens.add({
+        targets: [finalMessage, heart],
+        alpha: 1,
+        duration: 1500,
+        ease: 'Sine.easeInOut'
+      });
+
+      // Pulsazione cuore
+      this.tweens.add({
+        targets: heart,
+        scale: { from: 3, to: 3.3 },
+        duration: 600,
+        yoyo: true,
+        repeat: -1
+      });
     });
+    this.time.delayedCall(15000, () => this.scene.restart());
   }
 }
 
@@ -767,4 +826,61 @@ function playerDied() {
   this.time.delayedCall(2500, () => {
     this.scene.restart();
   });
+}
+
+function spawnBirdFlock() { 
+  const birdColors = ['red', 'blue', 'green'];
+  const numBirds = Phaser.Math.Between(3, 12);
+  const flyFromLeft = Math.random() < 0.5;
+
+  const camera = this.cameras.main;
+
+  const camX = camera.scrollX;
+  const camY = camera.scrollY;
+  const screenWidth = this.scale.width;
+
+  const startX = flyFromLeft ? camX - 100 : camX + screenWidth + 100;
+  const endX = flyFromLeft ? camX + screenWidth + 2000 : camX - 2000;
+
+  for (let i = 0; i < numBirds; i++) {
+    const color = Phaser.Utils.Array.GetRandom(birdColors);
+    const y = Phaser.Math.Between(20, this.scale.height / 2);
+    const delay = i * 150 + Phaser.Math.Between(0, 200);
+    const speed = Phaser.Math.Between(100, 200);
+
+    const bird = this.add.sprite(startX, y, `bird_${color}`)
+      .setScale(getRandomBiased(0.5, 1.5))
+      .play(`fly-${color}`);
+
+    if (flyFromLeft) {
+      bird.flipX = true;
+    }
+
+    const moveDuration = (Math.abs(endX - startX) / speed) * 1000;
+
+    this.tweens.add({
+      targets: bird,
+      x: endX,
+      duration: moveDuration,
+      delay: delay,
+    });
+
+    // Fa partire lo scale tween 1500ms prima della fine del primo tween
+    this.time.delayedCall(delay + moveDuration - 1500, () => {
+      this.tweens.add({
+        targets: bird,
+        scale: 0,
+        duration: 1500,
+        onComplete: () => {
+          bird.destroy();
+        }
+      });
+    });
+  }
+}
+
+function getRandomBiased(min, max, biasStrength = 2) {
+  const t = Math.random(); // uniforme tra 0 e 1
+  const skewed = Math.pow(1 - t, biasStrength); // più alto => più bias verso min
+  return min + (max - min) * skewed;
 }
